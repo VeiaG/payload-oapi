@@ -1,3 +1,7 @@
+> [!CAUTION]
+> This plugin is forked from the original [payload-oapi](https://github.com/janbuchar/payload-oapi).
+> I just added support to inject custom api endpoints into the OpenAPI spec.
+
 # Payload OpenAPI Plugin
 
 [![npm version](https://badge.fury.io/js/payload-oapi.svg)](https://www.npmjs.com/package/payload-oapi)
@@ -13,7 +17,7 @@ Autogenerate an OpenAPI specification from your Payload CMS instance and use it 
 - [x] Preferences endpoints
 - [x] Support Payload CMS 3.x
 - [x] Support generating both OpenAPI 3.0 and 3.1
-- [ ] Custom endpoints
+- [x] Custom endpoints
 
 # Installation
 
@@ -72,3 +76,47 @@ buildConfig({
 
 Unless you configured it otherwise, your spec will be accessible via <https://your-payload.com/api/openapi.json>. If you
 added a documentation UI, that will be accessible via <https://your-payload.com/api/docs> (this is also configurable).
+
+## Custom endpoints
+
+You can add your own custom endpoints to the generated OpenAPI specification. This is useful if you have endpoints that are not managed by Payload CMS.
+
+To add custom endpoints, use the `custom` option in the `openapi` plugin configuration:
+
+```typescript
+import { openapi } from 'payload-oapi'
+
+buildConfig({
+  plugins: [
+    openapi({
+      openapiVersion: '3.0',
+      metadata: { title: 'Dev API', version: '0.0.1' },
+      custom: {
+        '/my-custom-endpoint': {
+          get: {
+            summary: 'My custom endpoint',
+            responses: {
+              '200': {
+                description: 'Successful response',
+                content: {
+                  'application/json': {
+                    schema: {
+                      type: 'object',
+                      properties: {
+                        message: {
+                          type: 'string',
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    }),
+  ],
+  // ...
+})
+```

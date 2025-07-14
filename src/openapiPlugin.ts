@@ -3,6 +3,13 @@ import type { PluginOptions } from './types.js'
 
 import { createOAuthPasswordFlowHandler, createOpenAPIRequestHandler } from './requestHandlers.js'
 
+/**
+ * Plugin to generate OpenAPI spec
+ *
+ * @param options - plugin options
+ * @param options.custom - custom OpenAPI paths to be added to the spec
+ * @returns Payload plugin
+ */
 const openapi =
   ({
     specEndpoint = '/openapi.json',
@@ -10,6 +17,7 @@ const openapi =
     openapiVersion = '3.0',
     metadata,
     enabled = true,
+    custom,
   }: PluginOptions): Plugin =>
   ({ endpoints = [], ...config }) => {
     if (!enabled) {
@@ -27,6 +35,7 @@ const openapi =
             openapiVersion,
             metadata,
             authEndpoint,
+            custom,
           }),
         },
         {

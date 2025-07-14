@@ -602,6 +602,7 @@ export const generateV30Spec = async (
         Object.values(req.payload.collections).map(generateCollectionOperations),
       )),
       ...(await Promise.all(req.payload.globals.config.map(generateGlobalOperations))),
+      options.custom,
     ),
     components: {
       securitySchemes: generateSecuritySchemes(options.authEndpoint),
@@ -662,6 +663,7 @@ export const generateV31Spec = async (
         Object.values(req.payload.collections).map(generateCollectionOperations),
       )),
       ...(await Promise.all(req.payload.globals.config.map(generateGlobalOperations))),
+      options.custom,
     ),
     components: {
       securitySchemes: generateSecuritySchemes(options.authEndpoint),
