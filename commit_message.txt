@@ -1,1 +1,0 @@
-chore: replace release workflow with simpler version
