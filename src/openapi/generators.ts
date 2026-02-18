@@ -18,6 +18,7 @@ import type {
 import { entityToJSONSchema } from 'payload'
 import type { SanitizedPluginOptions } from '../types.js'
 import { isHiddenField } from '../utils/fields.js'
+import { shouldIncludeCollection, shouldIncludeGlobal } from '../utils/filters.js'
 import { mapValuesAsync, visitObjectNodes } from '../utils/objects.js'
 import { type ComponentType, collectionName, componentName, globalName } from './naming.js'
 import { apiKeySecurity, generateSecuritySchemes } from './securitySchemes.js'
@@ -587,7 +588,10 @@ const generateGlobalOperations = async (
   }
 }
 
-const generateComponents = (req: Pick<PayloadRequest, 'payload'>) => {
+const generateComponents = (
+  req: Pick<PayloadRequest, 'payload'>,
+  options: SanitizedPluginOptions,
+) => {
   const schemas: Record<string, JSONSchema4> = {
     supportedTimezones: {
       type: 'string',
@@ -595,7 +599,15 @@ const generateComponents = (req: Pick<PayloadRequest, 'payload'>) => {
     },
   }
 
-  for (const collection of Object.values(req.payload.collections)) {
+  const collections = Object.values(req.payload.collections).filter(collection =>
+    shouldIncludeCollection(collection, options.filters),
+  )
+
+  const globals = req.payload.globals.config.filter(global =>
+    shouldIncludeGlobal(global, options.filters),
+  )
+
+  for (const collection of collections) {
     const { singular } = collectionName(collection)
     schemas[componentName('schemas', singular)] = generateSchemaObject(
       req.payload.config,
@@ -603,17 +615,17 @@ const generateComponents = (req: Pick<PayloadRequest, 'payload'>) => {
     )
   }
 
-  for (const collection of Object.values(req.payload.collections)) {
+  for (const collection of collections) {
     Object.assign(schemas, generateQueryOperationSchemas(collection))
   }
 
-  for (const global of req.payload.globals.config) {
+  for (const global of globals) {
     Object.assign(schemas, generateGlobalSchemas(req.payload.config, global))
   }
 
   const requestBodies: Record<string, OpenAPIV3_1.RequestBodyObject> = {}
 
-  for (const collection of Object.values(req.payload.collections)) {
+  for (const collection of collections) {
     const { singular } = collectionName(collection)
     requestBodies[componentName('requestBodies', singular)] = generateRequestBodySchema(
       req.payload.config,
@@ -624,15 +636,15 @@ const generateComponents = (req: Pick<PayloadRequest, 'payload'>) => {
       generateRequestBodySchema(req.payload.config, collection, 'patch')
   }
 
-  for (const global of req.payload.globals.config) {
+  for (const global of globals) {
     requestBodies[componentName('requestBodies', globalName(global))] =
       generateGlobalRequestBody(global)
   }
 
   const responses: Record<string, OpenAPIV3_1.ResponseObject> = Object.assign(
     {},
-    ...Object.values(req.payload.collections).map(generateCollectionResponses),
-    ...req.payload.globals.config.map(global => ({
+    ...collections.map(generateCollectionResponses),
+    ...globals.map(global => ({
       [componentName('responses', globalName(global))]: generateGlobalResponse(global),
     })),
   )
@@ -644,7 +656,13 @@ export const generateV30Spec = async (
   req: Pick<PayloadRequest, 'payload' | 'protocol' | 'headers'>,
   options: SanitizedPluginOptions,
 ): Promise<OpenAPIV3.Document> => {
-  const { schemas, requestBodies, responses } = generateComponents(req)
+  const { schemas, requestBodies, responses } = generateComponents(req, options)
+
+  const filters = options.filters ?? {}
+  const collections = Object.values(req.payload.collections).filter(collection =>
+    shouldIncludeCollection(collection, filters),
+  )
+  const globals = req.payload.globals.config.filter(global => shouldIncludeGlobal(global, filters))
 
   const spec = {
     openapi: '3.0.3',
@@ -652,10 +670,8 @@ export const generateV30Spec = async (
     servers: [{ url: `${req.protocol}//${req.headers.get('host')}` }],
     paths: Object.assign(
       {},
-      ...(await Promise.all(
-        Object.values(req.payload.collections).map(generateCollectionOperations),
-      )),
-      ...(await Promise.all(req.payload.globals.config.map(generateGlobalOperations))),
+      ...(await Promise.all(collections.map(generateCollectionOperations))),
+      ...(await Promise.all(globals.map(generateGlobalOperations))),
     ),
     components: {
       securitySchemes: generateSecuritySchemes(options.authEndpoint),
@@ -704,7 +720,13 @@ export const generateV31Spec = async (
   req: Pick<PayloadRequest, 'payload' | 'protocol' | 'headers'>,
   options: SanitizedPluginOptions,
 ): Promise<OpenAPIV3_1.Document> => {
-  const { schemas, requestBodies, responses } = generateComponents(req)
+  const { schemas, requestBodies, responses } = generateComponents(req, options)
+
+  const filters = options.filters ?? {}
+  const collections = Object.values(req.payload.collections).filter(collection =>
+    shouldIncludeCollection(collection, filters),
+  )
+  const globals = req.payload.globals.config.filter(global => shouldIncludeGlobal(global, filters))
 
   const spec = {
     openapi: '3.1.0',
@@ -712,10 +734,8 @@ export const generateV31Spec = async (
     servers: [{ url: `${req.protocol}//${req.headers.get('host')}` }],
     paths: Object.assign(
       {},
-      ...(await Promise.all(
-        Object.values(req.payload.collections).map(generateCollectionOperations),
-      )),
-      ...(await Promise.all(req.payload.globals.config.map(generateGlobalOperations))),
+      ...(await Promise.all(collections.map(generateCollectionOperations))),
+      ...(await Promise.all(globals.map(generateGlobalOperations))),
     ),
     components: {
       securitySchemes: generateSecuritySchemes(options.authEndpoint),
