@@ -397,6 +397,7 @@ const isOpenToPublic = async (checker: Access): Promise<boolean> => {
 
 const generateCollectionOperations = async (
   collection: Collection,
+  options: SanitizedPluginOptions,
 ): Promise<Record<string, OpenAPIV3.PathItemObject & OpenAPIV3_1.PathItemObject>> => {
   const { slug } = collection.config
   const { singular, plural } = collectionName(collection)
@@ -458,17 +459,21 @@ const generateCollectionOperations = async (
         },
         security: (await isOpenToPublic(collection.config.access.read)) ? [] : [apiKeySecurity],
       },
-      post: {
-        operationId: componentName('schemas', singular, { prefix: 'create' }),
-        summary: `Create a new ${singular}`,
-        tags,
-        parameters: createQueryParams,
-        requestBody: composeRef('requestBodies', singular),
-        responses: {
-          201: composeRef('responses', singular, { prefix: 'Mutate' }),
+      ...(!options.readOnly && {
+        post: {
+          operationId: componentName('schemas', singular, { prefix: 'create' }),
+          summary: `Create a new ${singular}`,
+          tags,
+          parameters: createQueryParams,
+          requestBody: composeRef('requestBodies', singular),
+          responses: {
+            201: composeRef('responses', singular, { prefix: 'Mutate' }),
+          },
+          security: (await isOpenToPublic(collection.config.access.create))
+            ? []
+            : [apiKeySecurity],
         },
-        security: (await isOpenToPublic(collection.config.access.create)) ? [] : [apiKeySecurity],
-      },
+      }),
     },
     [`/api/${slug}/{id}`]: {
       parameters: [
@@ -495,21 +500,27 @@ const generateCollectionOperations = async (
         },
         security: (await isOpenToPublic(collection.config.access.read)) ? [] : [apiKeySecurity],
       },
-      patch: {
-        operationId: componentName('schemas', singular, { prefix: 'update' }),
-        summary: `Update a ${singular}`,
-        tags,
-        requestBody: composeRef('requestBodies', singular, { suffix: 'Patch' }),
-        responses: singleObjectResponses,
-        security: (await isOpenToPublic(collection.config.access.update)) ? [] : [apiKeySecurity],
-      },
-      delete: {
-        operationId: componentName('schemas', singular, { prefix: 'delete' }),
-        summary: `Delete a ${singular}`,
-        tags,
-        responses: singleObjectResponses,
-        security: (await isOpenToPublic(collection.config.access.delete)) ? [] : [apiKeySecurity],
-      },
+      ...(!options.readOnly && {
+        patch: {
+          operationId: componentName('schemas', singular, { prefix: 'update' }),
+          summary: `Update a ${singular}`,
+          tags,
+          requestBody: composeRef('requestBodies', singular, { suffix: 'Patch' }),
+          responses: singleObjectResponses,
+          security: (await isOpenToPublic(collection.config.access.update))
+            ? []
+            : [apiKeySecurity],
+        },
+        delete: {
+          operationId: componentName('schemas', singular, { prefix: 'delete' }),
+          summary: `Delete a ${singular}`,
+          tags,
+          responses: singleObjectResponses,
+          security: (await isOpenToPublic(collection.config.access.delete))
+            ? []
+            : [apiKeySecurity],
+        },
+      }),
     },
   }
 }
@@ -571,6 +582,7 @@ const generateGlobalSchemas = (
 
 const generateGlobalOperations = async (
   global: SanitizedGlobalConfig,
+  options: SanitizedPluginOptions,
 ): Promise<Record<string, OpenAPIV3.PathItemObject & OpenAPIV3_1.PathItemObject>> => {
   const slug = global.slug
   const singular = globalName(global)
@@ -585,13 +597,15 @@ const generateGlobalOperations = async (
         responses: { 200: composeRef('responses', singular) },
         security: (await isOpenToPublic(global.access.read)) ? [] : [apiKeySecurity],
       },
-      post: {
-        summary: `Update the ${singular}`,
-        tags,
-        requestBody: composeRef('requestBodies', singular),
-        responses: { 200: composeRef('responses', singular) },
-        security: (await isOpenToPublic(global.access.update)) ? [] : [apiKeySecurity],
-      },
+      ...(!options.readOnly && {
+        post: {
+          summary: `Update the ${singular}`,
+          tags,
+          requestBody: composeRef('requestBodies', singular),
+          responses: { 200: composeRef('responses', singular) },
+          security: (await isOpenToPublic(global.access.update)) ? [] : [apiKeySecurity],
+        },
+      }),
     },
   }
 }
@@ -723,11 +737,11 @@ export const generateV30Spec = async (
     servers: [{ url: `${req.protocol}//${req.headers.get('host')}` }],
     paths: Object.assign(
       {},
-      ...(await Promise.all(collections.map(generateCollectionOperations))),
-      ...(await Promise.all(globals.map(generateGlobalOperations))),
+      ...(await Promise.all(collections.map(c => generateCollectionOperations(c, options)))),
+      ...(await Promise.all(globals.map(g => generateGlobalOperations(g, options)))),
     ),
     components: {
-      securitySchemes: generateSecuritySchemes(options.authEndpoint),
+      securitySchemes: generateSecuritySchemes(),
       schemas: await mapValuesAsync(jsonSchemaToOpenapiSchema, schemas),
       requestBodies: await mapValuesAsync(
         async requestBody => ({
@@ -787,11 +801,11 @@ export const generateV31Spec = async (
     servers: [{ url: `${req.protocol}//${req.headers.get('host')}` }],
     paths: Object.assign(
       {},
-      ...(await Promise.all(collections.map(generateCollectionOperations))),
-      ...(await Promise.all(globals.map(generateGlobalOperations))),
+      ...(await Promise.all(collections.map(c => generateCollectionOperations(c, options)))),
+      ...(await Promise.all(globals.map(g => generateGlobalOperations(g, options)))),
     ),
     components: {
-      securitySchemes: generateSecuritySchemes(options.authEndpoint),
+      securitySchemes: generateSecuritySchemes(),
       schemas: schemas as Record<string, OpenAPIV3_1.SchemaObject>,
       requestBodies,
       responses,

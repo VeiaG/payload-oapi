@@ -5,11 +5,12 @@ import type { PluginOptions } from './types.js'
 const openapi =
   ({
     specEndpoint = '/openapi.json',
-    authEndpoint = '/openapi-auth',
+    authEndpoint = false,
     openapiVersion = '3.0',
     metadata,
     enabled = true,
     filters = {},
+    readOnly = false,
   }: PluginOptions): Plugin =>
   ({ endpoints = [], ...config }) => {
     if (!enabled) {
@@ -26,15 +27,19 @@ const openapi =
           handler: createOpenAPIRequestHandler({
             openapiVersion,
             metadata,
-            authEndpoint,
             filters,
+            readOnly,
           }),
         },
-        {
-          method: 'post',
-          path: authEndpoint,
-          handler: createOAuthPasswordFlowHandler(),
-        },
+        ...(authEndpoint
+          ? [
+              {
+                method: 'post' as const,
+                path: authEndpoint,
+                handler: createOAuthPasswordFlowHandler(),
+              },
+            ]
+          : []),
       ],
     }
   }
