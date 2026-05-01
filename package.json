@@ -21,10 +21,10 @@
     "lint": "biome check",
     "lint:fix": "biome check --write",
     "clean": "rimraf dist && rimraf dev/yarn.lock",
-    "prepublishOnly": "yarn build",
+    "prepublishOnly": "pnpm build",
     "dev": "payload run ./dev/server.ts",
-    "dev:generate-importmap": "yarn dev:payload generate:importmap",
-    "dev:generate-types": "yarn dev:payload generate:types",
+    "dev:generate-importmap": "pnpm dev:payload generate:importmap",
+    "dev:generate-types": "pnpm dev:payload generate:types",
     "dev:payload": "cross-env PAYLOAD_CONFIG_PATH=./dev/payload.config.ts TSX_TSCONFIG_PATH=./dev/tsconfig.json payload",
     "test": "vitest run"
   },
